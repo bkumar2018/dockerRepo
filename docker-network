@@ -1,0 +1,111 @@
+//////////////////////////////Docker network/////////////////////
+Q: List networks in docker:
+~ ➜  docker network ls
+NETWORK ID     NAME      DRIVER    SCOPE
+e9edf0c29c4d   bridge    bridge    local
+a9ddd20e58a2   host      host      local
+38672f05baf9   none      null      local
+
+  Q: Inspect network and find attached driver
+docker inspect alpine-1
+
+Q: Inspect bridge network and get its detail
+docker network inspect bridge
+~ ➜  docker network inspect bridge
+[
+    {
+        "Name": "bridge",
+        "Id": "e9edf0c29c4d72ad01c714312a684ca3bf95076b644f627e22fb11202f63b45c",
+        "Created": "2024-11-22T11:40:51.241364895Z",
+        "Scope": "local",
+        "Driver": "bridge",
+        "EnableIPv6": false,
+        "IPAM": {
+            "Driver": "default",
+            "Options": null,
+            "Config": [
+                {
+                    "Subnet": "172.12.0.0/24",
+                    "Gateway": "172.12.0.1"
+                }
+            ]
+        },
+        "Internal": false,
+        "Attachable": false,
+        "Ingress": false,
+        "ConfigFrom": {
+            "Network": ""
+        },
+        "ConfigOnly": false,
+        "Containers": {},
+        "Options": {
+            "com.docker.network.bridge.default_bridge": "true",
+            "com.docker.network.bridge.enable_icc": "true",
+            "com.docker.network.bridge.enable_ip_masquerade": "true",
+            "com.docker.network.bridge.host_binding_ipv4": "0.0.0.0",
+            "com.docker.network.bridge.name": "docker0",
+            "com.docker.network.driver.mtu": "1500"
+        },
+        "Labels": {}
+    }
+]
+
+Q: Run a container named alpine-2 using the alpine image and attach it to the none network.
+A: 
+docker run --network=none --name=alpine-2 alpine
+
+
+Q:Create a new network named wp-mysql-network using the bridge driver. Allocate subnet 182.18.0.0/24. Configure Gateway 182.18.0.1
+A:
+
+docker network create --driver=bridge --subnet=182.18.0.0/24 --gateway=182.18.0.1 wp-mysql-network
+
+docker network create \
+  --driver bridge \
+  --subnet 182.18.0.0/24 \
+  --gateway 182.18.0.1 \
+  wp-mysql-network
+
+Q:
+Deploy a mysql database using the mysql:5.6 image and name it mysql-db. Attach it to the newly created network wp-mysql-network
+Set the database password to use db_pass123. The environment variable to set is MYSQL_ROOT_PASSWORD.
+
+A:
+
+docker run --name=mysql-db --network=wp-mysql-network -e MYSQL_ROOT_PASSWORD=db_pass123 mysql:5.6
+
+docker run -d \
+  --name mysql-db \
+  --network wp-mysql-network \
+  -e MYSQL_ROOT_PASSWORD=db_pass123 \
+  mysql:5.6
+
+Q:
+Deploy a web application named webapp using the kodekloud/simple-webapp-mysql image.
+Expose the port to 38080 on the host.
+
+The application makes use of two environment variable:
+1: DB_Host with the value mysql-db.
+2: DB_Password with the value db_pass123.
+Make sure to attach it to the newly created network called wp-mysql-network.
+
+
+Also make sure to link the MySQL and the webapp container.
+
+A:
+docker run -d --name=webapp --network=wp-mysql-network -e DB_Host=mysql-db -e DB_Password=db_pass123 -p 38080:80  kodekloud/simple-webapp-mysql
+
+docker run -d \
+  --name webapp \
+  --network wp-mysql-network \
+  -p 38080:80 \
+  kodekloud/simple-webapp-mysql
+
+
+~ ➜  docker ps -a
+CONTAINER ID   IMAGE                           COMMAND                  CREATED          STATUS                      PORTS                                               NAMES
+f9d524caffb7   kodekloud/simple-webapp-mysql   "/bin/sh -c 'python …"   8 seconds ago    Up 6 seconds                8080/tcp, 0.0.0.0:38080->80/tcp, :::38080->80/tcp   webapp
+30fb4c86eaa8   mysql:5.6                       "docker-entrypoint.s…"   10 minutes ago   Up 10 minutes               3306/tcp                                            mysql-db
+e3ad1c8b3dbf   alpine                          "/bin/sh"                20 minutes ago   Exited (0) 20 minutes ago                                                       alpine-2
+28785b1f812b   alpine                          "sleep 1000"             27 minutes ago   Created                                                                         alpine-1
+
